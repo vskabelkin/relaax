@@ -1,0 +1,31 @@
+
+syntax = "proto3";
+
+message NullMessage {}
+
+message Step {
+    fixed64 n = 1;
+}
+
+message NdArrayPart {
+    string dtype = 1;
+    repeated int32 shape = 2;
+    bool last_part = 3;
+    bytes data = 4;
+}
+
+message ScalarMetric {
+    string name = 1;
+    double y = 2;
+    message Arg {
+        double value = 1;
+    }
+    Arg x = 3;
+}
+
+service ParameterServer {
+    rpc IncrementGlobalT(NullMessage) returns (Step) {}
+    rpc ApplyGradients(stream NdArrayPart) returns (NullMessage) {}
+    rpc GetValues(NullMessage) returns (stream NdArrayPart) {}
+    rpc StoreScalarMetric(ScalarMetric) returns (NullMessage) {}
+}

@@ -19,7 +19,7 @@ relaax-rlx-server:
   --log-level: WARNING
 
 algorithm:
-  path: ../relaax/algorithms/policy_grad  # path to algorithm package
+  path: ../relaax/algorithms/policy_grad_keras  # path to algorithm package
 
   action_size: 6                  # action size for the given environment (gym's Pong)
   state_size: [84, 84]            # pass flattened or n-element list for an image-like state
