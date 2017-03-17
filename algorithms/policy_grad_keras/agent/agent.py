@@ -3,6 +3,7 @@ from __future__ import print_function
 import numpy as np
 from six import moves
 import tensorflow as tf     # needs to evaluate (compute) gradients
+import keras.backend
 import time
 
 import relaax.algorithm_base.agent_base
@@ -34,7 +35,8 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
             self.prev_state = np.zeros(self._config.state_size)
 
         self._session = tf.Session()    # needs for gradients
-        # self._session.run(tf.variables_initializer(tf.global_variables()))
+        keras.backend.set_session(self._session)
+        self._session.run(tf.variables_initializer(tf.global_variables()))
 
     def act(self, state):
         start = time.time()

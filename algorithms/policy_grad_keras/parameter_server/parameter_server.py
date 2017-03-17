@@ -1,4 +1,5 @@
-import tensorflow as tf
+import tensorflow as tf     # needs for gradients applying
+import keras.backend
 
 import relaax.algorithm_base.bridge_base
 import relaax.algorithm_base.parameter_server_base
@@ -12,6 +13,7 @@ class ParameterServer(relaax.algorithm_base.parameter_server_base.ParameterServe
         self._network = network.make(config)
 
         self._session = tf.Session()
+        keras.backend.set_session(self._session)
 
         self._saver = saver_factory(
             relaax.server.common.saver.tensorflow_checkpoint.TensorflowCheckpoint(
@@ -20,7 +22,6 @@ class ParameterServer(relaax.algorithm_base.parameter_server_base.ParameterServe
         )
 
         self._session.run(tf.variables_initializer(tf.global_variables()))
-
         self._bridge = _Bridge(metrics, self._network, self._session)
 
     def close(self):
@@ -55,7 +56,8 @@ class _Bridge(relaax.algorithm_base.bridge_base.BridgeBase):
         self._session.run(self._network.apply_gradients, feed_dict=feed_dict)
 
     def get_values(self):
-        return self._session.run(self._network.values)
+        return self._network.values
+        # self._session.run(self._network.values)
 
     def metrics(self):
         return self._metrics
