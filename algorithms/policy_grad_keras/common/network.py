@@ -1,4 +1,8 @@
-import tensorflow as tf
+from keras import backend as K
+from keras.models import Model
+from keras.layers import Input, Dense
+from keras.optimizers import Adam, TFOptimizer
+import tensorflow as tf     # needs to use tf optimizer instead of Keras one
 import numpy as np
 
 
@@ -16,8 +20,8 @@ def make_shared_network(config):
 class GlobalPolicyNN(object):
     # This class is used for global-NN and holds only weights on which applies computed gradients
     def __init__(self, config):
-        self.global_t = tf.Variable(0, tf.int64)
-        self.increment_global_t = tf.assign_add(self.global_t, 1)
+        self.global_t = K.variable(0, 'int64')    # tf.Variable(0, tf.int64)
+        self.increment_global_t = K.update_add(self.global_t, 1)  # tf.assign_add(self.global_t, 1)
 
         self._input_size = np.prod(np.array(config.state_size))
         self._action_size = config.action_size
@@ -25,6 +29,20 @@ class GlobalPolicyNN(object):
         if type(config.layers_size) not in [list, tuple]:
             config.layers_size = [config.layers_size]
 
+        # Define keras model immediately --> we just define vars in tf case and its "links" for agent later.
+        # We also can define variables manually, but work directly with models is more keras-like style.
+        input_ = Input(shape=(self._input_size,))
+        throw_ = Dense(config.layers_size[0], activation='elu', kernel_initializer='glorot_normal')(input_)
+
+        # glorot_uniform == xavier, we can also set: bias_initializer='zeros'
+        for i in range(1, len(config.layers_size)):
+            throw_ = Dense(config.layers_size[i], activation='elu', kernel_initializer='glorot_normal')(throw_)
+
+        throw_ = Dense(self._action_size, activation='softmax', kernel_initializer='glorot_normal')(throw_)
+        self.net = Model(input=input_, output=throw_)
+
+        self.values = self.net.trainable_weights
+        '''
         self.values = [tf.get_variable('W0', shape=[self._input_size, config.layers_size[0]],
                                        initializer=tf.contrib.layers.xavier_initializer())]
         idx = len(config.layers_size)
@@ -38,14 +56,9 @@ class GlobalPolicyNN(object):
         self._assign_values = tf.group(*[
             tf.assign(v, p) for v, p in zip(self.values, self._placeholders)
             ])
-
-        self.gradients = [tf.placeholder(v.dtype, v.get_shape()) for v in self.values]
+        '''
+        self.gradients = [K.placeholder(v.get_shape(), dtype=v.dtype) for v in self.values]
         self.learning_rate = config.learning_rate
-
-    def assign_values(self, session, values):
-        session.run(self._assign_values, feed_dict={
-            p: v for p, v in zip(self._placeholders, values)
-            })
 
     def get_vars(self):
         return self.values
@@ -64,30 +77,26 @@ class AgentPolicyNN(GlobalPolicyNN):
         super(AgentPolicyNN, self).__init__(config)
 
         # state (input)
-        self.s = tf.placeholder(tf.float32, [None, self._input_size])
-
-        structure = [tf.nn.relu(tf.matmul(self.s, self.values[0]))]
-        for i in range(1, len(self.values) - 1):
-            structure.append(tf.nn.relu(tf.matmul(structure[i-1], self.values[i])))
+        self.s = self.net.input
 
         # policy (output)
-        self.pi = tf.nn.sigmoid(tf.matmul(structure[-1], self.values[-1]))
+        self.pi = self.net.output
 
-    def run_policy(self, sess, s_t):
-        pi_out = sess.run(self.pi, feed_dict={self.s: [s_t]})
-        return pi_out[0]
+    def run_policy(self, s_t):
+        # pi_out = sess.run(self.pi, feed_dict={self.s: [s_t]})
+        return self.net(s_t)
 
     def compute_gradients(self):
-        self.grads = tf.gradients(self.loss, self.values)
+        self.grads = K.gradients(self.loss, self.values)
         return self
 
     def prepare_loss(self):
-        self.a = tf.placeholder(tf.float32, [None, self._action_size], name="taken_action")
-        self.advantage = tf.placeholder(tf.float32, name="discounted_reward")
+        self.a = K.placeholder((None, self._action_size), dtype='float32', name="taken_action")
+        self.advantage = K.placeholder((None,), dtype='float32', name="discounted_reward")
 
         # making actions that gave good advantage (reward over time) more likely,
         # and actions that didn't less likely.
-        log_like = tf.log(tf.reduce_sum(tf.multiply(self.a, self.pi)))
-        self.loss = -tf.reduce_mean(log_like * self.advantage)
+        log_like = K.log(K.sum(tf.multiply(self.a, self.pi)))
+        self.loss = -K.mean(log_like * self.advantage)
 
         return self
