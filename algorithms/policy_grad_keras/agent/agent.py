@@ -1,7 +1,8 @@
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+from six import moves
+import tensorflow as tf     # needs to evaluate (compute) gradients
 import time
 
 import relaax.algorithm_base.agent_base
@@ -32,9 +33,8 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
                 self._config.state_size = [config.state_size]
             self.prev_state = np.zeros(self._config.state_size)
 
-        self._session = tf.Session()
-
-        self._session.run(tf.variables_initializer(tf.global_variables()))
+        self._session = tf.Session()    # needs for gradients
+        # self._session.run(tf.variables_initializer(tf.global_variables()))
 
     def act(self, state):
         start = time.time()
@@ -50,14 +50,15 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
 
         if self.episode_t == 0:
             # copy weights from shared to local
-            self._local_network.assign_values(self._session, self._parameter_server.get_values())
+            self._local_network.set_weights(self._parameter_server.get_values())
+            # self._local_network.assign_values(self._session, self._parameter_server.get_values())
 
             self.states = []
             self.actions = []
             self.rewards = []
 
         # Run the policy network and get an action to take
-        probs = self._local_network.run_policy(self._session, state)
+        probs = self._local_network.run_policy(state)   # rm self._session
         action = self.choose_action(probs)
 
         self.states.append(state)
@@ -128,7 +129,7 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
         """ take 1D float array of rewards and compute discounted reward """
         discounted_r = np.zeros_like(r)
         running_add = 0
-        for t in reversed(xrange(0, r.size)):
+        for t in reversed(moves.xrange(0, r.size)):
             running_add = running_add * self._config.GAMMA + r[t]
             discounted_r[t] = running_add
         # size the rewards to be unit normal (helps control the gradient estimator variance)

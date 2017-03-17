@@ -31,7 +31,7 @@ class GlobalPolicyNN(object):
 
         # Define keras model immediately --> we just define vars in tf case and its "links" for agent later.
         # We also can define variables manually, but work directly with models is more keras-like style.
-        input_ = Input(shape=(self._input_size,))
+        input_ = Input(shape=(None, self._input_size))
         throw_ = Dense(config.layers_size[0], activation='elu', init='glorot_normal')(input_)
 
         # glorot_uniform == xavier, we can also set: bias_initializer='zeros'
