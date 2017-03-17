@@ -52,18 +52,19 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
 
         if self.episode_t == 0:
             # copy weights from shared to local
-            self._local_network.set_weights(self._parameter_server.get_values())
-            # self._local_network.assign_values(self._session, self._parameter_server.get_values())
+            self._local_network.assign_values(self._session, self._parameter_server.get_values())
+            # self._local_network.net.set_weights(self._parameter_server.get_values())
 
             self.states = []
             self.actions = []
             self.rewards = []
 
         # Run the policy network and get an action to take
-        probs = self._local_network.run_policy(state)   # rm self._session
+        probs = self._local_network.run_policy(self._session, state)   # rm self._session
         action = self.choose_action(probs)
 
         self.states.append(state)
+
 
         action_vec = np.zeros([self._config.action_size])  # one-hot vector to store taken action
         action_vec[action] = 1

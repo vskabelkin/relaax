@@ -56,8 +56,8 @@ class _Bridge(relaax.algorithm_base.bridge_base.BridgeBase):
         self._session.run(self._network.apply_gradients, feed_dict=feed_dict)
 
     def get_values(self):
-        return self._network.values
-        # self._session.run(self._network.values)
+        # return self._network.net.get_weights()
+        return self._session.run(self._network.values)
 
     def metrics(self):
         return self._metrics

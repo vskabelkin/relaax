@@ -31,7 +31,7 @@ class GlobalPolicyNN(object):
 
         # Define keras model immediately --> we just define vars in tf case and its "links" for agent later.
         # We also can define variables manually, but work directly with models is more keras-like style.
-        input_ = Input(shape=(None, self._input_size))
+        input_ = Input(shape=(self._input_size,))
         throw_ = Dense(config.layers_size[0], activation='elu', init='glorot_normal')(input_)
 
         # glorot_uniform == xavier, we can also set: bias_initializer='zeros'
@@ -51,14 +51,19 @@ class GlobalPolicyNN(object):
                                                initializer=tf.contrib.layers.xavier_initializer()))
         self.values.append(tf.get_variable('W%d' % idx, shape=[config.layers_size[-1], self._action_size],
                                            initializer=tf.contrib.layers.xavier_initializer()))
-
-        self._placeholders = [tf.placeholder(v.dtype, v.get_shape()) for v in self.values]
-        self._assign_values = tf.group(*[
-            tf.assign(v, p) for v, p in zip(self.values, self._placeholders)
-            ])
         '''
+        self._placeholders = [K.placeholder(v.get_shape(), dtype=v.dtype) for v in self.values]
+        self._assign_values = tf.group(*[
+            K.update(v, p) for v, p in zip(self.values, self._placeholders)
+            ])
+
         self.gradients = [K.placeholder(v.get_shape(), dtype=v.dtype) for v in self.values]
         self.learning_rate = config.learning_rate
+
+    def assign_values(self, session, values):
+        session.run(self._assign_values, feed_dict={
+            p: v for p, v in zip(self._placeholders, values)
+            })
 
     def get_vars(self):
         return self.values
@@ -82,9 +87,10 @@ class AgentPolicyNN(GlobalPolicyNN):
         # policy (output)
         self.pi = self.net.output
 
-    def run_policy(self, s_t):
-        # pi_out = sess.run(self.pi, feed_dict={self.s: [s_t]})
-        return self.net(s_t)
+    def run_policy(self, sess, s_t):
+        pi_out = sess.run(self.pi, feed_dict={self.s: [s_t]})
+        return pi_out[0]
+        # return self.net(s_t)
 
     def compute_gradients(self):
         self.grads = K.gradients(self.loss, self.values)
@@ -92,7 +98,7 @@ class AgentPolicyNN(GlobalPolicyNN):
 
     def prepare_loss(self):
         self.a = K.placeholder((None, self._action_size), dtype='float32', name="taken_action")
-        self.advantage = K.placeholder((None,), dtype='float32', name="discounted_reward")
+        self.advantage = K.placeholder(ndim=2, dtype='float32', name="discounted_reward")
 
         # making actions that gave good advantage (reward over time) more likely,
         # and actions that didn't less likely.
